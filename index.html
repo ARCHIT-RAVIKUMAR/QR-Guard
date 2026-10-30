@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>QR Guard — QR Code Security Explorer</title>
+<style>
+:root{--bg:#f3efe6;--card:#fbf9f4;--tx:#1c1b18;--mut:#6a665c;--bd:#cfc8b8;--ac:#0f5c4d;--ok:#15803d;--okb:#e3f6e9;--wa:#a15c07;--wab:#fdf0d5;--bad:#b91c1c;--badb:#fde4e4;--info:#475569;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14130f;--card:#1c1b16;--tx:#ece8dc;--mut:#a29d8e;--bd:#38352b;--ac:#5fc4a8;--ok:#5fd488;--okb:#12301f;--wa:#f0b64d;--wab:#35290e;--bad:#ff8a8a;--badb:#3a1616;--info:#94a3b8;color-scheme:dark}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:20px 16px 48px}
+h1{font:700 1.6rem ui-monospace,Menlo,Consolas,monospace;letter-spacing:-.02em;margin:.2em 0;border-bottom:3px solid var(--ac);display:inline-block;padding-bottom:2px}h2{font:600 .85rem ui-monospace,Menlo,Consolas,monospace;text-transform:uppercase;letter-spacing:.08em;margin:0 0 10px}
+.sub{color:var(--mut);margin:0 0 18px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:3px;padding:16px;margin-bottom:16px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+button,.btn{font:inherit;border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:8px 14px;border-radius:3px;cursor:pointer}
+button.on,button.pri{background:var(--ac);color:#fff;border-color:var(--ac)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) button.on,:root:not([data-theme="light"]) button.pri{color:#0b1020}}
+button:disabled{opacity:.5;cursor:not-allowed}
+.drop{border:2px dashed var(--bd);border-radius:3px;padding:28px 12px;text-align:center;color:var(--mut);cursor:pointer}
+.drop.over{border-color:var(--ac)}
+video{width:100%;max-height:360px;background:#000;border-radius:3px}
+input[type=text]{width:100%;font:inherit;padding:9px 10px;border:1px solid var(--bd);border-radius:3px;background:var(--bg);color:var(--tx)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+pre{margin:6px 0 0;padding:10px;background:var(--bg);border:1px solid var(--bd);border-radius:3px;white-space:pre-wrap;word-break:break-all;font:14px/1.4 ui-monospace,Menlo,Consolas,monospace}
+.badge{display:inline-block;padding:3px 10px;border-radius:3px;font:700 .9rem ui-monospace,Menlo,Consolas,monospace;text-transform:uppercase;letter-spacing:.05em}
+.b-safe{background:var(--okb);color:var(--ok)}.b-caution{background:var(--wab);color:var(--wa)}.b-bad{background:var(--badb);color:var(--bad)}
+ul{padding-left:20px;margin:6px 0}li{margin:4px 0}
+.tag{font-size:.72rem;font-weight:700;border-radius:4px;padding:1px 6px;margin-right:6px;text-transform:uppercase}
+.t-high{background:var(--badb);color:var(--bad)}.t-med{background:var(--wab);color:var(--wa)}.t-info{background:var(--bg);color:var(--info);border:1px solid var(--bd)}
+.samples{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.s{border:1px solid var(--bd);border-radius:3px;padding:10px;text-align:center}
+.s img{width:150px;height:150px;image-rendering:pixelated;background:#fff;padding:6px;border-radius:6px}
+.s small{display:block;color:var(--mut);word-break:break-all;margin:4px 0 8px}
+.hid{display:none}
+.lim li{color:var(--mut)}
+details summary{cursor:pointer;font-weight:600}
+</style>
+</head>
+<body>
+<main>
+<h1>QR Guard</h1>
+<p class="sub">Check where a QR code leads <b>before</b> you follow it. Decoding happens in your browser, nothing gets uploaded, and no link opens unless you say so.</p>
+
+<div class="card">
+  <div class="tabs" role="tablist">
+    <button class="on" data-tab="up">Upload image</button>
+    <button data-tab="cam">Scan with camera</button>
+    <button data-tab="txt">Paste a link</button>
+  </div>
+  <div id="up">
+    <label class="drop" id="drop">Tap to choose a QR image, or drop one here
+      <input type="file" id="file" accept="image/*" class="hid"></label>
+  </div>
+  <div id="cam" class="hid">
+    <video id="vid" playsinline muted></video>
+    <div class="row"><button class="pri" id="camGo">Start camera</button><button id="camStop" disabled>Stop</button></div>
+    <p class="sub" id="camMsg" style="margin-top:8px"></p>
+  </div>
+  <div id="txt" class="hid">
+    <input type="text" id="paste" placeholder="Paste a URL or text to analyze (no QR needed)" autocomplete="off">
+    <div class="row"><button class="pri" id="pasteGo">Analyze</button></div>
+  </div>
+  <canvas id="cv" class="hid"></canvas>
+  <p id="err" class="hid" style="color:var(--bad);margin:10px 0 0"></p>
+</div>
+
+<div class="card hid" id="res" aria-live="polite">
+  <h2>Result</h2>
+  <div><b>Risk level:</b> <span class="badge" id="rBadge"></span> <span id="rScore" class="sub"></span></div>
+  <p style="margin:12px 0 0"><b>Decoded content</b> <span class="sub" id="rKind"></span></p>
+  <pre id="rText"></pre>
+  <div class="row"><button id="copy">Copy text</button><button id="open" class="hid">Open anyway…</button></div>
+  <div id="openBox" class="hid" style="margin-top:8px"></div>
+  <p style="margin:14px 0 0"><b>Why this rating</b></p><ul id="rFind"></ul>
+  <p style="margin:14px 0 0"><b>Safety recommendations</b></p><ul id="rRec"></ul>
+</div>
+
+<div class="card">
+  <h2>Sample QR codes</h2>
+  <p class="sub">All fictional. Suspicious samples use reserved test domains (<code>.example</code>, <code>example.com</code>) and a TEST-NET IP address, so they cannot reach any real site. Tap “Scan this sample” to decode the image through the same pipeline as an upload.</p>
+  <div class="samples" id="samples"></div>
+</div>
+
+<div class="card">
+  <details><summary>How it works &amp; limitations</summary>
+  <p><b>Decoding:</b> jsQR reads the QR image locally on a canvas. Camera frames are processed in memory only.</p>
+  <p><b>Scoring:</b> each heuristic adds points: shorteners (+3), raw IP (+4), <code>user@host</code> tricks (+3), punycode/non-ASCII (+3), brand lookalikes (+3), plain HTTP (+2), unusual port (+2), 3+ subdomains (+2), redirect parameters (+2), executable downloads (+3), suspicious keywords (+1 each, max 3), long URL (+1/+2), risky TLD (+1). Score 0–1 = Safe, 2–4 = Caution, 5+ = Suspicious.</p>
+  <ul class="lim"><li>Heuristics only: there is no reputation or blocklist lookup, and short links are not expanded (that would require visiting them).</li>
+  <li>“Safe” means no red flags found, not guaranteed safe. A compromised legitimate site will look fine.</li>
+  <li>Lookalike detection covers a small built-in brand list and simple typo/leet patterns.</li>
+  <li>Camera scanning needs HTTPS and permission; some embedded previews block the camera, so open the page in its own tab.</li>
+  <li>Damaged, tiny or low-contrast QR images may fail to decode.</li></ul></details>
+</div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const SHORT=new Set(['bit.ly','tinyurl.com','t.co','goo.gl','ow.ly','is.gd','buff.ly','rebrand.ly','cutt.ly','shorturl.at','tiny.cc','rb.gy','t.ly','s.id','lnkd.in','qrco.de']);
+const KW=['verify','login','signin','urgent','prize','winner','claim','suspend','locked','secure','update','confirm','password','otp','bonus','free','gift','refund','kyc','wallet'];
+const RISKY_TLD=new Set(['zip','mov','top','xyz','tk','ml','ga','cf','gq','click','icu','work','rest','country']);
+const BRANDS={google:'google.com',paypal:'paypal.com',amazon:'amazon.com',microsoft:'microsoft.com',apple:'apple.com',facebook:'facebook.com',instagram:'instagram.com',netflix:'netflix.com',paytm:'paytm.com',whatsapp:'whatsapp.com',hdfcbank:'hdfcbank.com',icicibank:'icicibank.com',sbi:'onlinesbi.sbi'};
+const OFFICIAL=new Set([...Object.values(BRANDS),'amazon.in','amazonaws.com','google.co.in','googleapis.com','gstatic.com','googleusercontent.com','microsoftonline.com','live.com','office.com','sbi.co.in','icloud.com']);
+const SAMPLES=[
+ ['Legitimate (placeholder)','https://www.example.com/menu'],
+ ['Fake login + keywords','http://paypa1-secure-login.example/verify?user=demo&urgent=1'],
+ ['Raw IP + odd port','http://192.0.2.15:8080/prize/claim'],
+ ['Punycode lookalike','http://xn--pypal-4ve.example/signin'],
+ ['Deep subdomains + redirect','https://login.account.secure.update.example.test/go?redirect=http://example.org/'],
+ ['Plain text','Welcome to QR Guard. This is just text, no link.']
+];
+function lev(a,b){const d=Array.from({length:a.length+1},(_,i)=>[i]);for(let j=1;j<=b.length;j++)d[0][j]=j;
+ for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]==b[j-1]?0:1));return d[a.length][b.length]}
+function regDomain(labels){const n=labels.length;if(n<=2)return labels.join('.');
+ const sl=['co','com','org','net','gov','ac','edu'];return(labels[n-1].length==2&&sl.includes(labels[n-2]))?labels.slice(-3).join('.'):labels.slice(-2).join('.')}
+
+function analyze(raw){
+ const t=raw.trim(),f=[],R={kind:'',score:0,f,rec:[]};
+ const add=(sev,pts,txt)=>{f.push({sev,txt});R.score+=pts};
+ const sch=(t.match(/^([a-z][a-z0-9+.-]*):(?=\S)/i)||[])[1];
+ let url=null;
+ if(sch&&/^https?$/i.test(sch)){try{url=new URL(t)}catch(e){add('high',3,'Looks like a web link but is malformed.')}}
+ else if(!sch&&/^[^\s\/]+\.[a-z]{2,}(\/\S*)?$/i.test(t)){try{url=new URL('http://'+t);R.kind='(no scheme; assumed http)';add('med',1,'No protocol given, so the link’s security is unclear.')}catch(e){}}
+ if(!url){
+  const s=(sch||'').toLowerCase();
+  if(['javascript','data','file','vbscript'].includes(s)){R.kind='Active content';add('high',5,'“'+s+':” can run code or expose local data when opened.');R.rec.push('Do not open or paste this anywhere. Delete the QR source if it came from a sticker or message.')}
+  else if(s==='tel'||s==='sms'||s==='smsto'||s==='mailto'){R.kind=s.toUpperCase()+' action';add('med',2,'Scanning may start a call, text or email to the number/address shown.');R.rec.push('Check the recipient and any pre-filled message before sending. Premium-rate numbers can cost money.')}
+  else if(/^wifi:/i.test(t)){R.kind='Wi-Fi login';add('med',2,'Joining an unknown Wi-Fi network can expose your traffic.');R.rec.push('Join only networks you recognise. Avoid sensitive logins on public Wi-Fi.')}
+  else if(s==='upi'||/^(bitcoin|ethereum|monero):/i.test(t)||/^(upi|pay)/i.test(s)){R.kind='Payment request';add('med',3,'Payment QR codes can move money; check payee and amount.');R.rec.push('Confirm the payee name and amount in your payment app. Never scan a QR to “receive” money — receiving never needs a PIN.')}
+  else if(/^BEGIN:VCARD/i.test(t)){R.kind='Contact card';add('info',0,'Adds contact details; check them before saving.')}
+  else if(s){R.kind='App/custom link ('+s+':)';add('med',2,'Custom schemes can launch other apps.');R.rec.push('Only continue if you recognise the app and trust where the code came from.')}
+  else{R.kind='Plain text';add('info',0,'Not a link, just text.')}
+ } else {
+  R.kind=R.kind||'URL';
+  const h=url.hostname.toLowerCase(),labels=h.split('.'),reg=regDomain(labels),tld=labels[labels.length-1];
+  const full=url.href,lc=(h+url.pathname+url.search).toLowerCase();
+  if(/\.(example|test|invalid|localhost)$/.test(h)||/(^|\.)example\.(com|org|net)$/.test(h))add('info',0,'Reserved placeholder domain. It can’t resolve to a real website.');
+  if(url.protocol==='http:')add('med',2,'Not HTTPS: traffic is unencrypted and can be altered or spied on.');
+  if(/^\d{1,3}(\.\d{1,3}){3}$/.test(h)||h.startsWith('['))add('high',4,'Uses a raw IP address instead of a domain name.');
+  if(SHORT.has(h)||SHORT.has(reg))add('high',3,'URL shortener: the real destination is hidden.');
+  if(url.username||url.password)add('high',3,'Contains “user@” credentials, a trick to make a fake host look real.');
+  if(url.port&&!['80','443'].includes(url.port))add('med',2,'Unusual port ('+url.port+').');
+  if(h.includes('xn--')||/[^\x00-\x7f]/.test(t))add('high',3,'Internationalized/punycode characters can imitate real domains.');
+  const subs=labels.length-reg.split('.').length;
+  if(subs>=3&&!/^\d/.test(h))add('med',2,'Many subdomains ('+subs+'): the real domain is the last part, “'+reg+'”.');
+  if((h.match(/-/g)||[]).length>=3)add('med',1,'Many hyphens in the domain name.');
+  if(full.length>200)add('med',2,'Very long URL ('+full.length+' characters).');else if(full.length>100)add('med',1,'Long URL ('+full.length+' characters).');
+  if(RISKY_TLD.has(tld))add('med',1,'“.'+tld+'” is a TLD frequently abused for throwaway sites.');
+  if(/[?&](url|redirect|redirect_uri|next|continue|dest|target|return|goto)=https?(:|%3a)/i.test(url.search))add('high',2,'Contains a redirect parameter pointing to another site.');
+  if(/\.(apk|exe|msi|scr|bat|dmg|jar|zip)$/i.test(url.pathname))add('high',3,'Link downloads a program or archive.');
+  if(/%25[0-9a-f]{2}/i.test(full))add('med',1,'Double-encoded characters, sometimes used to dodge filters.');
+  const toks=lc.split(/[^a-z0-9]+/);const hits=[...new Set(KW.filter(k=>toks.includes(k)))];
+  if(hits.length)add('med',Math.min(hits.length,3),'Pressure/credential keywords: '+hits.join(', ')+'.');
+  const leet=h.replace(/0/g,'o').replace(/1/g,'l').replace(/3/g,'e').replace(/5/g,'s').replace(/rn/g,'m').replace(/vv/g,'w');
+  const label=reg.split('.')[0];let flagged=false;
+  for(const b in BRANDS){
+   if(OFFICIAL.has(reg))break;
+   if(b.length<5?new RegExp('(^|[.-])'+b+'([.-]|$)').test(leet):(leet.includes(b)||h.includes(b))){add('high',3,'Mentions “'+b+'” but the real domain is “'+reg+'” (official: '+BRANDS[b]+').');flagged=true;break}
+   const l2=label.replace(/0/g,'o').replace(/1/g,'l').replace(/3/g,'e').replace(/5/g,'s');
+   if(b.length>=6&&lev(l2,b)<=(b.length>=8?2:1)&&l2!==b){add('high',3,'Domain “'+label+'” is a near-miss of “'+b+'” (possible typosquat).');flagged=true;break}
+  }
+ }
+ const s=R.score;
+ R.level=s>=5?'Suspicious':s>=2?'Caution':'Safe';
+ if(!f.some(x=>x.sev!=='info'))f.push({sev:'info',txt:'No red flags found by these checks. That is not a guarantee.'});
+ const rec=R.rec;
+ if(url){
+  if(R.level==='Suspicious')rec.push('Do not open this link or enter any details. Treat the source (sticker, email, message) as untrusted.','If it was on a physical sign or poster, check for a sticker pasted over the original code and tell the venue.','If you already visited it, change passwords you entered and contact your bank for any payment info.');
+  else if(R.level==='Caution')rec.push('Verify the destination another way — type the official site yourself or use the official app.','Don’t log in or pay from this link unless you’re certain who made it.');
+  else rec.push('Still check that the domain matches who you expect before you sign in or pay.','Keep your browser and phone updated; avoid entering passwords from QR links when possible.');
+ } else if(!rec.length)rec.push('Nothing risky detected, but only act on content you expect.');
+ return R;
+}
+
+let cur='';
+function show(text,tag){
+ const R=analyze(text);cur=text;err('');
+ $('res').classList.remove('hid');
+ const b=$('rBadge');b.textContent=R.level;b.className='badge '+(R.level==='Safe'?'b-safe':R.level==='Caution'?'b-caution':'b-bad');
+ $('rScore').textContent='(risk score '+R.score+')';
+ $('rKind').textContent='· '+R.kind;
+ $('rText').textContent=text;
+ const fl=$('rFind');fl.replaceChildren();
+ R.f.forEach(x=>{const li=document.createElement('li'),s=document.createElement('span');s.className='tag t-'+x.sev;s.textContent=x.sev==='high'?'High':x.sev==='med'?'Medium':'Note';li.append(s,x.txt);fl.append(li)});
+ const rl=$('rRec');rl.replaceChildren();R.rec.forEach(x=>{const li=document.createElement('li');li.textContent=x;rl.append(li)});
+ $('open').classList.toggle('hid',!/^https?:\/\//i.test(text.trim()));$('openBox').classList.add('hid');
+ $('res').scrollIntoView({behavior:'smooth',block:'start'});
+}
+$('copy').onclick=async()=>{try{await navigator.clipboard.writeText(cur);$('copy').textContent='Copied ✓'}catch(e){$('copy').textContent='Copy failed'}setTimeout(()=>$('copy').textContent='Copy text',1500)};
+function err(m){const e=$('err');e.textContent=m;e.classList.toggle('hid',!m)}
+$('open').onclick=()=>{const b=$('openBox');b.replaceChildren();const p=document.createElement('p');p.style.margin='0 0 4px';p.textContent='Only continue if you trust this destination:';const a=document.createElement('a');a.href=cur.trim();a.target='_blank';a.rel='noopener noreferrer';a.textContent='Open link in a new tab';b.append(p,a);b.classList.remove('hid')};
+
+const cv=$('cv'),ctx=cv.getContext('2d',{willReadFrequently:true});
+function decodeImg(img){
+ const w0=img.naturalWidth||img.width,h0=img.naturalHeight||img.height,sc=Math.min(1,1200/Math.max(w0,h0));
+ cv.width=Math.round(w0*sc);cv.height=Math.round(h0*sc);
+ ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);ctx.drawImage(img,0,0,cv.width,cv.height);
+ const d=ctx.getImageData(0,0,cv.width,cv.height);
+ const c=jsQR(d.data,d.width,d.height,{inversionAttempts:'attemptBoth'});
+ if(c&&c.data!==undefined&&c.data!=='')show(c.data);
+ else err('No QR code found. Try a sharper, well-lit image with the whole code visible.')
+}
+function loadFile(file){if(!file||!file.type.startsWith('image/'))return;const u=URL.createObjectURL(file),i=new Image();i.onload=()=>{decodeImg(i);URL.revokeObjectURL(u)};i.onerror=()=>err('Could not read that image.');i.src=u}
+$('file').onchange=e=>loadFile(e.target.files[0]);
+const dz=$('drop');
+['dragover','dragenter'].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.add('over')}));
+['dragleave','drop'].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.remove('over')}));
+dz.addEventListener('drop',e=>loadFile(e.dataTransfer.files[0]));
+
+let stream=null,raf=0;
+function stopCam(){cancelAnimationFrame(raf);if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;$('camStop').disabled=true;$('camGo').disabled=false}
+$('camStop').onclick=()=>{stopCam();$('camMsg').textContent='Camera stopped.'};
+$('camGo').onclick=async()=>{
+ const v=$('vid'),m=$('camMsg');
+ try{
+  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+  v.srcObject=stream;await v.play();$('camGo').disabled=true;$('camStop').disabled=false;m.textContent='Point the camera at a QR code…';
+  const tick=()=>{
+   if(v.readyState>=2&&v.videoWidth){
+    cv.width=v.videoWidth;cv.height=v.videoHeight;ctx.drawImage(v,0,0);
+    const d=ctx.getImageData(0,0,cv.width,cv.height),c=jsQR(d.data,d.width,d.height,{inversionAttempts:'dontInvert'});
+    if(c&&c.data){stopCam();m.textContent='Code captured. Camera stopped.';show(c.data);return}
+   }
+   raf=requestAnimationFrame(tick)};
+  tick();
+ }catch(e){m.textContent='Camera unavailable ('+(e.name||'error')+'). Allow camera access, make sure the page is on HTTPS, or open it in its own browser tab. You can also upload an image instead.'}
+};
+$('pasteGo').onclick=()=>{const v=$('paste').value;if(v.trim())show(v)};
+$('paste').addEventListener('keydown',e=>{if(e.key==='Enter')$('pasteGo').click()});
+
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('on',x===b));
+ ['up','cam','txt'].forEach(id=>$(id).classList.toggle('hid',id!==b.dataset.tab));
+ if(b.dataset.tab!=='cam')stopCam()});
+
+const sg=$('samples');
+SAMPLES.forEach(([name,text])=>{
+ const d=document.createElement('div');d.className='s';
+ const n=document.createElement('b');n.textContent=name;
+ const img=new Image();img.alt='QR code: '+name;
+ try{const q=qrcode(0,'M');q.addData(text);q.make();img.src=q.createDataURL(5,4)}catch(e){}
+ const sm=document.createElement('small');sm.textContent=text;
+ const bt=document.createElement('button');bt.textContent='Scan this sample';
+ bt.onclick=()=>{if(img.complete&&img.naturalWidth)decodeImg(img);else show(text)};
+ d.append(n,document.createElement('br'),img,sm,bt);sg.append(d)});
+</script>
+</body>
+</html>
